@@ -94,11 +94,10 @@ def deep_analyze(title, snippet, link, academic_level):
     }
     headers = {'Content-Type': 'application/json'}
     
-    # FIXED: Replaced hallucinations with real Google Gemini models
+    # FIXED: Forcing latest models and adding X-Ray diagnostics
     models_to_try = [
-        "gemini-1.5-pro",         
-        "gemini-1.5-flash",       
-        "gemini-1.5-flash-8b"   
+        "gemini-1.5-pro-latest",         
+        "gemini-1.5-flash-latest"   
     ]
     
     for model in models_to_try:
@@ -118,11 +117,16 @@ def deep_analyze(title, snippet, link, academic_level):
                 
                 linkedin = find_linkedin_profile(contact, title)
                 return sponsor, eligibility, loc, deadline, reqs, contact, linkedin
-            elif response.status_code in [503, 429, 404]: continue
-            else: continue
-        except Exception: continue
+            else:
+                # DIAGNOSTIC CODE: Print exactly why Google is mad
+                st.toast(f"❌ {model} failed with Code {response.status_code}")
+                st.error(f"**Google API Error:** {response.text}")
+                continue
+        except Exception as e: 
+            st.error(f"**Network Crash:** {str(e)}")
+            continue
             
-    return "Error", "Error", "Error", "Error", "All 3 AI models overloaded. Please try again in 1 minute.", "Error", "Error"
+    return "Error", "Error", "Error", "Error", "All models failed. Check the red error boxes above.", "Error", "Error"
 
 def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
@@ -162,7 +166,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.3 (Smart Retry & Valid Models)")
+    st.caption("AI Opportunity Agent v18.4 (X-Ray Diagnostic Mode)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -218,7 +222,7 @@ else:
             
             analyzed = str(current_job.get('Analyzed', 'No'))
             
-            # --- FIXED: SMART RETRY LOGIC ---
+            # --- SMART RETRY LOGIC ---
             if analyzed != "Yes":
                 if analyzed == "Failed":
                     st.error("⚠️ The last AI analysis attempt failed due to server overload. You can try again.")
@@ -239,7 +243,7 @@ else:
                         df.at[current_index, 'Contact Name'] = contact
                         df.at[current_index, 'LinkedIn'] = linkedin
                         
-                        # THE FIX: Only lock the analysis if it actually worked!
+                        # Only lock the analysis if it actually worked!
                         if sponsor == "Error":
                             df.at[current_index, 'Analyzed'] = "Failed"
                         else:
