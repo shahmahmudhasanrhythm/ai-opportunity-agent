@@ -40,7 +40,7 @@ def find_linkedin_profile(person_name, context):
         query1 = f"{person_name} {context} LinkedIn"
         res1 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query1, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
         
-        if "error" not in res1: # If no quota error, use it
+        if "error" not in res1: 
             for item in res1.get("organic_results", []):
                 if "linkedin.com/in/" in item.get("link", ""): return item["link"]
                 
@@ -50,7 +50,7 @@ def find_linkedin_profile(person_name, context):
                 if "linkedin.com/in/" in item.get("link", ""): return item["link"]
             return "Not Found" 
     except Exception:
-        pass # If SerpApi fails or is out of tokens, stay silent and drop to Tier 2
+        pass 
 
     # --- TIER 2: DuckDuckGo (The Unlimited Free Backup) ---
     try:
@@ -96,12 +96,13 @@ def deep_analyze(title, snippet, link, academic_level):
     
     models_to_try = [
         "gemini-1.5-pro",         
-        "gemini-2.5-flash",       
-        "gemini-2.5-flash-lite"   
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b"
     ]
     
     for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        # THE FIX: Removed 'beta' from v1beta. The official production endpoint is v1.
+        url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=15)
             if response.status_code == 200:
@@ -165,7 +166,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.5 (Fixed Error Rerun Trap)")
+    st.caption("AI Opportunity Agent v18.6 (V1 API Fix)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -241,18 +242,16 @@ else:
                         df.at[current_index, 'Contact Name'] = contact
                         df.at[current_index, 'LinkedIn'] = linkedin
                         
-                        # THE CRITICAL FIX: Only rerun the page if it succeeded!
                         if sponsor == "Error":
                             df.at[current_index, 'Analyzed'] = "Failed"
                             try:
                                 df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                                # No st.rerun() here, so the error message stays visible
                             except PermissionError: st.error("🚨 Close Excel to save analysis!")
                         else:
                             df.at[current_index, 'Analyzed'] = "Yes"
                             try:
                                 df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                                st.rerun() # Success! Refresh the page to show the clean data
+                                st.rerun() 
                             except PermissionError: st.error("🚨 Close Excel to save analysis!")
 
             else:
