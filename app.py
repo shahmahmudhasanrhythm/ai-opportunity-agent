@@ -94,7 +94,6 @@ def deep_analyze(title, snippet, link, academic_level):
     }
     headers = {'Content-Type': 'application/json'}
     
-    # FIXED: Forcing latest models and adding X-Ray diagnostics
     models_to_try = [
         "gemini-1.5-pro-latest",         
         "gemini-1.5-flash-latest"   
@@ -118,9 +117,8 @@ def deep_analyze(title, snippet, link, academic_level):
                 linkedin = find_linkedin_profile(contact, title)
                 return sponsor, eligibility, loc, deadline, reqs, contact, linkedin
             else:
-                # DIAGNOSTIC CODE: Print exactly why Google is mad
                 st.toast(f"❌ {model} failed with Code {response.status_code}")
-                st.error(f"**Google API Error:** {response.text}")
+                st.error(f"**Google API Error ({model}):** {response.text}")
                 continue
         except Exception as e: 
             st.error(f"**Network Crash:** {str(e)}")
@@ -166,7 +164,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.4 (X-Ray Diagnostic Mode)")
+    st.caption("AI Opportunity Agent v18.5 (Fixed Error Rerun Trap)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -222,10 +220,9 @@ else:
             
             analyzed = str(current_job.get('Analyzed', 'No'))
             
-            # --- SMART RETRY LOGIC ---
             if analyzed != "Yes":
                 if analyzed == "Failed":
-                    st.error("⚠️ The last AI analysis attempt failed due to server overload. You can try again.")
+                    st.error("⚠️ The last AI analysis attempt failed. See exact error below if you try again.")
                 else:
                     st.info("💡 **Raw Opportunity.** The AI has not extracted the requirements or checked your visa eligibility yet.")
                 
@@ -243,16 +240,19 @@ else:
                         df.at[current_index, 'Contact Name'] = contact
                         df.at[current_index, 'LinkedIn'] = linkedin
                         
-                        # Only lock the analysis if it actually worked!
+                        # THE CRITICAL FIX: Only rerun the page if it succeeded!
                         if sponsor == "Error":
                             df.at[current_index, 'Analyzed'] = "Failed"
+                            try:
+                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                                # No st.rerun() here, so the error message stays visible
+                            except PermissionError: st.error("🚨 Close Excel to save analysis!")
                         else:
                             df.at[current_index, 'Analyzed'] = "Yes"
-                        
-                        try:
-                            df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                            st.rerun()
-                        except PermissionError: st.error("🚨 Close Excel to save analysis!")
+                            try:
+                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                                st.rerun() # Success! Refresh the page to show the clean data
+                            except PermissionError: st.error("🚨 Close Excel to save analysis!")
 
             else:
                 eligibility_text = str(current_job.get("Eligibility", "Unknown"))
@@ -322,10 +322,7 @@ else:
 
             st.write("---")
             
-            # --- UPGRADED: FIREWALL DETECTOR FOR PREVIEWS ---
             st.write("### 🌐 Live Website Preview")
-            
-            # List of notorious Anti-Embedding domains
             blocked_domains = ["linkedin.com", "github.com", "myworkdayjobs.com", "taleo.net", "apple.com", "google.com", "greenhouse.io", "lever.co"]
             is_blocked_domain = any(domain in link_url.lower() for domain in blocked_domains)
             
