@@ -136,8 +136,6 @@ def deep_analyze(title, snippet, link, academic_level):
     return "Error", "Error", "Error", "Error", "All models failed. Traffic is too high.", "Error", "Error"
 
 def ask_gemini_chat(chat_history):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-    
     formatted_contents = []
     for msg in chat_history:
         role = "user" if msg["role"] == "user" else "model"
@@ -146,14 +144,27 @@ def ask_gemini_chat(chat_history):
     payload = {"contents": formatted_contents}
     headers = {'Content-Type': 'application/json'}
     
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=20)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"API Error: {response.status_code}"
-    except Exception as e:
-        return f"Network Error: {str(e)}"
+    # Give the chat the same bulletproof cascade as the scraper!
+    models_to_try = [
+        "gemini-2.5-flash", 
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-pro"
+    ]
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=20)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            elif response.status_code == 429:
+                continue # If this model is in a timeout, skip to the next one!
+            else:
+                return f"API Error: {response.status_code} on {model}"
+        except Exception as e:
+            continue
+            
+    return "⏳ Whoa there! We've hit the Google free-tier speed limit (Error 429). Give it exactly 60 seconds to cool down, and try asking me again!"
 
 def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
