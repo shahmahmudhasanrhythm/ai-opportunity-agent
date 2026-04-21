@@ -94,15 +94,16 @@ def deep_analyze(title, snippet, link, academic_level):
     }
     headers = {'Content-Type': 'application/json'}
     
+    # THE ACTUAL LIVE 2026 MODELS
     models_to_try = [
-        "gemini-1.5-pro",         
-        "gemini-1.5-flash",
-        "gemini-1.5-flash-8b"
+        "gemini-2.5-flash",         
+        "gemini-2.5-pro",
+        "gemini-2.5-flash-lite"
     ]
     
     for model in models_to_try:
-        # THE FIX: Removed 'beta' from v1beta. The official production endpoint is v1.
-        url = f"https://generativelanguage.googleapis.com/v1/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        # Reverted to v1beta which perfectly supports the 2.5 series
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=15)
             if response.status_code == 200:
@@ -166,7 +167,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.6 (V1 API Fix)")
+    st.caption("AI Opportunity Agent v18.7 (Final 2.5 Fix)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
