@@ -14,14 +14,13 @@ st.set_page_config(page_title="Freshman AI Opportunity Agent", page_icon="🤖",
 CSV_FILE = "AI_Opportunities_Groq_Smart.csv"
 
 # --- SECRETS MANAGEMENT (CLOUD SAFE) ---
-# This ensures Google's bots don't lock your account again!
 SERPAPI_KEY = st.secrets["SERPAPI_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 # --- CHAT MEMORY SETUP ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's conquer Westlake University! How can I help you today?"}
+        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's conquer Westlake! How can I help you today?"}
     ]
 
 # --- AI & SCRAPING FUNCTIONS ---
@@ -44,7 +43,7 @@ def extract_field(ai_text, field_name):
 def find_linkedin_profile(person_name, context):
     if person_name in ["Unknown", "Not Found", "None", "N/A", "Error", ""]: return "Not Found"
     
-    # --- TIER 1: SerpApi (The VIP Google Search) ---
+    # --- TIER 1: SerpApi ---
     try:
         query1 = f"{person_name} {context} LinkedIn"
         res1 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query1, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
@@ -61,7 +60,7 @@ def find_linkedin_profile(person_name, context):
     except Exception:
         pass 
 
-    # --- TIER 2: DuckDuckGo (The Unlimited Free Backup) ---
+    # --- TIER 2: DuckDuckGo ---
     try:
         query = f"{person_name} {context} LinkedIn"
         with DDGS() as ddgs:
@@ -98,12 +97,9 @@ def deep_analyze(title, snippet, link, academic_level):
     Website Content: {page_content}
     """
     
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}]
-    }
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
     
-    # Active 2026 Models
     models_to_try = [
         "gemini-2.5-flash",         
         "gemini-2.5-pro",
@@ -128,9 +124,8 @@ def deep_analyze(title, snippet, link, academic_level):
                 linkedin = find_linkedin_profile(contact, title)
                 return sponsor, eligibility, loc, deadline, reqs, contact, linkedin
             else:
-                st.toast(f"❌ {model} failed with Code {response.status_code}")
                 continue
-        except Exception as e: 
+        except Exception: 
             continue
             
     return "Error", "Error", "Error", "Error", "All models failed. Traffic is too high.", "Error", "Error"
@@ -144,12 +139,7 @@ def ask_gemini_chat(chat_history):
     payload = {"contents": formatted_contents}
     headers = {'Content-Type': 'application/json'}
     
-    # Give the chat the same bulletproof cascade as the scraper!
-    models_to_try = [
-        "gemini-2.5-flash", 
-        "gemini-2.5-flash-lite",
-        "gemini-2.5-pro"
-    ]
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]
     
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
@@ -158,13 +148,13 @@ def ask_gemini_chat(chat_history):
             if response.status_code == 200:
                 return response.json()['candidates'][0]['content']['parts'][0]['text']
             elif response.status_code == 429:
-                continue # If this model is in a timeout, skip to the next one!
+                continue 
             else:
                 return f"API Error: {response.status_code} on {model}"
-        except Exception as e:
+        except Exception:
             continue
             
-    return "⏳ Whoa there! We've hit the Google free-tier speed limit (Error 429). Give it exactly 60 seconds to cool down, and try asking me again!"
+    return "⏳ Whoa there! We've hit the Google free-tier speed limit. Give it exactly 60 seconds to cool down, and try asking me again!"
 
 def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
@@ -204,7 +194,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v19.0 (Cloud Chat Build)")
+    st.caption("AI Command Center v1.0")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -232,149 +222,129 @@ if run_search:
 
 else:
     df = load_data()
-    st.title("🔥 AI Opportunity Deck")
+    st.title("🔥 AI Command Center")
 
-    if df.empty:
-        st.warning("Database empty. Use the sidebar to start a fast gather!")
-        st.stop()
-
-    # --- THE 3 TABS ---
-    tab1, tab2, tab3 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "💬 AI Assistant"])
+    # --- THE 4 TABS ---
+    tab1, tab2, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "💬 AI Assistant", "🧰 AI Toolbox"])
 
     with tab1:
-        pending_jobs = df[(df['Status'] == "")]
-        
-        if pending_jobs.empty:
-            st.success("🎉 All caught up on swiping!")
-            if st.button("Reset All Swipes"):
-                df['Status'] = ""
-                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                st.rerun()
+        if df.empty:
+            st.warning("Database empty. Use the sidebar to start a fast gather!")
         else:
-            current_index = pending_jobs.index[0]
-            current_job = df.loc[current_index]
-            link_url = str(current_job.get('Direct Link', '#'))
-
-            st.header(str(current_job.get("Opportunity Name", "Unknown Title")))
-            st.write(f"**Snippet:** {current_job.get('Description Snippet', 'No snippet available.')}")
-            st.markdown(f"**[🔗 Open Full Website in New Tab]({link_url})**")
+            pending_jobs = df[(df['Status'] == "")]
             
-            analyzed = str(current_job.get('Analyzed', 'No'))
-            
-            if analyzed != "Yes":
-                if analyzed == "Failed":
-                    st.error("⚠️ The last AI analysis attempt failed due to traffic. You can try again.")
-                else:
-                    st.info("💡 **Raw Opportunity.** The AI has not extracted the requirements or checked your visa eligibility yet.")
-                
-                if st.button("🧠 Deep Analyze & Check Eligibility", use_container_width=True, type="primary"):
-                    with st.spinner("Cascading through Gemini Models to check your visa status..."):
-                        sponsor, eligibility, loc, deadline, reqs, contact, linkedin = deep_analyze(
-                            current_job['Opportunity Name'], current_job['Description Snippet'], current_job['Direct Link'], academic_level
-                        )
-                        
-                        df.at[current_index, 'Sponsorship'] = sponsor
-                        df.at[current_index, 'Eligibility'] = eligibility
-                        df.at[current_index, 'Location'] = loc
-                        df.at[current_index, 'Deadline'] = deadline
-                        df.at[current_index, 'Requirements'] = reqs
-                        df.at[current_index, 'Contact Name'] = contact
-                        df.at[current_index, 'LinkedIn'] = linkedin
-                        
-                        if sponsor == "Error":
-                            df.at[current_index, 'Analyzed'] = "Failed"
-                            try:
-                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                            except PermissionError: st.error("🚨 Close Excel to save analysis!")
-                        else:
-                            df.at[current_index, 'Analyzed'] = "Yes"
-                            try:
-                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                                st.rerun() 
-                            except PermissionError: st.error("🚨 Close Excel to save analysis!")
-
+            if pending_jobs.empty:
+                st.success("🎉 All caught up on swiping!")
+                if st.button("Reset All Swipes"):
+                    df['Status'] = ""
+                    df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                    st.rerun()
             else:
-                eligibility_text = str(current_job.get("Eligibility", "Unknown"))
-                if eligibility_text.startswith("Yes"): st.success(f"**✅ Can I Apply?** {eligibility_text}")
-                elif eligibility_text.startswith("No"): st.error(f"**❌ Can I Apply?** {eligibility_text}")
-                else: st.warning(f"**🤔 Can I Apply?** {eligibility_text}")
-                
-                sponsor = str(current_job.get("Sponsorship", "Unknown"))
-                if sponsor == "No Sponsorship": st.error("🚩 RED FLAG: This program likely DOES NOT sponsor visas.")
-                elif sponsor == "International Friendly": st.success("🌍 GLOBAL: Explicitly open to international students!")
-                
-                st.write(f"**🗓️ Deadline:** {current_job.get('Deadline', 'Not found')}")
-                st.write(f"**📋 Requirements:** {current_job.get('Requirements', 'Not found')}")
-                
-                loc = str(current_job.get("Location", "Unknown"))
-                if loc != "Unknown" and loc != "": st.write(f"📍 **Format/Location:** {loc}")
-                
-                st.write("---")
-                st.subheader("💼 Networking & Contacts")
-                contact_name = str(current_job.get('Contact Name', 'Unknown')).strip()
-                linkedin_url = str(current_job.get('LinkedIn', 'Not Found')).strip()
-                
-                if contact_name not in ["Unknown", "Not Found", "nan", "Error", ""] and linkedin_url.startswith("http"):
-                    st.success(f"**Target Acquired:** {contact_name} — **[🔗 Connect on LinkedIn]({linkedin_url})**")
-                    
-                elif contact_name not in ["Unknown", "Not Found", "nan", "Error", ""]:
-                    st.warning(f"**Target Identified:** {contact_name} *(Profile not auto-linked)*")
-                    if st.button(f"🔍 Run Deep LinkedIn Radar for {contact_name}"):
-                        with st.spinner("Deploying aggressive secondary search agent..."):
-                            new_link = find_linkedin_profile(contact_name, current_job['Opportunity Name'])
-                            if new_link != "Not Found":
-                                df.at[current_index, 'LinkedIn'] = new_link
-                                st.success("Target Acquired! Reloading...")
-                            else:
-                                df.at[current_index, 'LinkedIn'] = "No Public Profile"
-                                st.error("Agent could not find a public LinkedIn profile for this contact.")
-                            try:
-                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
-                                time.sleep(1)
-                                st.rerun()
-                            except PermissionError: st.error("🚨 Close Excel to save analysis!")
-                            
-                else:
-                    st.info("The AI could not find a specific professor or recruiter name in the text.")
-                    safe_query = urllib.parse.quote(current_job.get('Opportunity Name', 'AI Internship'))
-                    search_url = f"https://www.linkedin.com/search/results/all/?keywords={safe_query}"
-                    st.link_button("🔍 Search Organization on LinkedIn", search_url, type="primary")
+                current_index = pending_jobs.index[0]
+                current_job = df.loc[current_index]
+                link_url = str(current_job.get('Direct Link', '#'))
 
-            st.write("---")
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("❌ Pass", use_container_width=True):
-                    try:
+                st.header(str(current_job.get("Opportunity Name", "Unknown Title")))
+                st.write(f"**Snippet:** {current_job.get('Description Snippet', 'No snippet available.')}")
+                st.markdown(f"**[🔗 Open Full Website in New Tab]({link_url})**")
+                
+                analyzed = str(current_job.get('Analyzed', 'No'))
+                
+                if analyzed != "Yes":
+                    if analyzed == "Failed":
+                        st.error("⚠️ The last AI analysis attempt failed due to traffic. You can try again.")
+                    else:
+                        st.info("💡 **Raw Opportunity.** The AI has not extracted the requirements or checked your visa eligibility yet.")
+                    
+                    if st.button("🧠 Deep Analyze & Check Eligibility", use_container_width=True, type="primary"):
+                        with st.spinner("Cascading through Gemini Models to check your visa status..."):
+                            sponsor, eligibility, loc, deadline, reqs, contact, linkedin = deep_analyze(
+                                current_job['Opportunity Name'], current_job['Description Snippet'], current_job['Direct Link'], academic_level
+                            )
+                            
+                            df.at[current_index, 'Sponsorship'] = sponsor
+                            df.at[current_index, 'Eligibility'] = eligibility
+                            df.at[current_index, 'Location'] = loc
+                            df.at[current_index, 'Deadline'] = deadline
+                            df.at[current_index, 'Requirements'] = reqs
+                            df.at[current_index, 'Contact Name'] = contact
+                            df.at[current_index, 'LinkedIn'] = linkedin
+                            
+                            if sponsor == "Error":
+                                df.at[current_index, 'Analyzed'] = "Failed"
+                                try:
+                                    df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                                except PermissionError: pass
+                            else:
+                                df.at[current_index, 'Analyzed'] = "Yes"
+                                try:
+                                    df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                                    st.rerun() 
+                                except PermissionError: pass
+
+                else:
+                    eligibility_text = str(current_job.get("Eligibility", "Unknown"))
+                    if eligibility_text.startswith("Yes"): st.success(f"**✅ Can I Apply?** {eligibility_text}")
+                    elif eligibility_text.startswith("No"): st.error(f"**❌ Can I Apply?** {eligibility_text}")
+                    else: st.warning(f"**🤔 Can I Apply?** {eligibility_text}")
+                    
+                    sponsor = str(current_job.get("Sponsorship", "Unknown"))
+                    if sponsor == "No Sponsorship": st.error("🚩 RED FLAG: This program likely DOES NOT sponsor visas.")
+                    elif sponsor == "International Friendly": st.success("🌍 GLOBAL: Explicitly open to international students!")
+                    
+                    st.write(f"**🗓️ Deadline:** {current_job.get('Deadline', 'Not found')}")
+                    st.write(f"**📋 Requirements:** {current_job.get('Requirements', 'Not found')}")
+                    
+                    loc = str(current_job.get("Location", "Unknown"))
+                    if loc != "Unknown" and loc != "": st.write(f"📍 **Format/Location:** {loc}")
+                    
+                    st.write("---")
+                    st.subheader("💼 Networking & Contacts")
+                    contact_name = str(current_job.get('Contact Name', 'Unknown')).strip()
+                    linkedin_url = str(current_job.get('LinkedIn', 'Not Found')).strip()
+                    
+                    if contact_name not in ["Unknown", "Not Found", "nan", "Error", ""] and linkedin_url.startswith("http"):
+                        st.success(f"**Target Acquired:** {contact_name} — **[🔗 Connect on LinkedIn]({linkedin_url})**")
+                    elif contact_name not in ["Unknown", "Not Found", "nan", "Error", ""]:
+                        st.warning(f"**Target Identified:** {contact_name} *(Profile not auto-linked)*")
+                        if st.button(f"🔍 Run Deep LinkedIn Radar for {contact_name}"):
+                            with st.spinner("Deploying aggressive secondary search agent..."):
+                                new_link = find_linkedin_profile(contact_name, current_job['Opportunity Name'])
+                                df.at[current_index, 'LinkedIn'] = new_link if new_link != "Not Found" else "No Public Profile"
+                                df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
+                                st.rerun()
+                    else:
+                        st.info("The AI could not find a specific professor or recruiter name in the text.")
+                        safe_query = urllib.parse.quote(current_job.get('Opportunity Name', 'AI Internship'))
+                        st.link_button("🔍 Search Organization on LinkedIn", f"https://www.linkedin.com/search/results/all/?keywords={safe_query}", type="primary")
+
+                st.write("---")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("❌ Pass", use_container_width=True):
                         df.at[current_index, 'Status'] = 'Passed'
                         df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
                         st.rerun()
-                    except PermissionError: st.error("🚨 Close Excel!")
 
-            with col2:
-                if st.button("💚 Shortlist", use_container_width=True):
-                    try:
+                with col2:
+                    if st.button("💚 Shortlist", use_container_width=True):
                         df.at[current_index, 'Status'] = 'Shortlisted'
                         df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
                         st.rerun()
-                    except PermissionError: st.error("🚨 Close Excel!")
 
-            st.write("---")
-            
-            st.write("### 🌐 Live Website Preview")
-            blocked_domains = ["linkedin.com", "github.com", "myworkdayjobs.com", "taleo.net", "apple.com", "google.com", "greenhouse.io", "lever.co"]
-            is_blocked_domain = any(domain in link_url.lower() for domain in blocked_domains)
-            
-            if link_url.startswith("http"):
-                if is_blocked_domain:
-                    st.warning("🔒 **High Security Website Detected.** This organization explicitly blocks website embedding to prevent clickjacking.")
-                    st.link_button(f"👉 Click to Open '{current_job.get('Opportunity Name', 'Website')}' in a New Tab", link_url, type="primary")
-                else:
-                    try:
-                        st.components.v1.iframe(link_url, height=600, scrolling=True)
-                        st.caption("🔒 Note: If you see a grey error box above, this specific university server blocked the preview. Please use the blue link at the top to open it.")
-                    except Exception: 
-                        st.write("Preview blocked.")
+                st.write("---")
+                st.write("### 🌐 Live Website Preview")
+                blocked_domains = ["linkedin.com", "github.com", "myworkdayjobs.com", "taleo.net", "apple.com", "google.com", "greenhouse.io", "lever.co"]
+                if link_url.startswith("http"):
+                    if any(domain in link_url.lower() for domain in blocked_domains):
+                        st.warning("🔒 **High Security Website Detected.** This organization explicitly blocks website embedding.")
+                        st.link_button(f"👉 Click to Open in a New Tab", link_url, type="primary")
+                    else:
+                        try:
+                            st.components.v1.iframe(link_url, height=600, scrolling=True)
+                        except Exception: 
+                            st.write("Preview blocked.")
 
     with tab2:
         st.write("### 🗄️ Your Full Opportunity Database")
@@ -382,16 +352,13 @@ else:
 
     with tab3:
         st.subheader("🧠 Your Personal AI Sandbox")
-        st.caption("Chat with Gemini 2.5 Flash directly from your app.")
+        st.caption("Chat with Gemini directly from your app. The API handles traffic spikes automatically now!")
         
-        # Draw all previous chat messages
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["text"])
                 
-        # Chat input box
-        if prompt := st.chat_input("Ask me to write code, draft an email, or brainstorm..."):
-            
+        if prompt := st.chat_input("Ask me to write Python code, brainstorm MUN strategies, or draft an email..."):
             st.session_state.messages.append({"role": "user", "text": prompt})
             with st.chat_message("user"):
                 st.markdown(prompt)
@@ -402,3 +369,38 @@ else:
                     st.markdown(response_text)
             
             st.session_state.messages.append({"role": "model", "text": response_text})
+
+    with tab4:
+        st.subheader("🧰 Your AI Engineering Toolbox")
+        st.markdown("A curated directory of the most powerful LLMs, autonomous agents, and development platforms for your AI/ML journey.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("### 🧠 Advanced LLMs & Interfaces")
+            st.markdown("""
+            * **[Claude (by Anthropic)](https://claude.ai):** Currently the industry heavy-hitter for advanced coding, complex logic, and long-context analysis.
+            * **[Groq](https://groq.com/):** The fastest AI inference engine on earth (powered by LPU hardware). Perfect for when you build real-time voice or text applications.
+            * **[Hugging Face Chat](https://huggingface.co/chat/):** Free access to top open-source models like Llama 3 and Mistral. It's essentially the GitHub of AI.
+            * **[OpenAI Platform](https://platform.openai.com/):** The backend dashboard for GPT-4o. Great for building multimodal vision and audio apps.
+            """)
+
+            st.write("### 💻 AI Coding & Agents")
+            st.markdown("""
+            * **[Cursor IDE](https://cursor.sh/):** An AI-first code editor. Instead of copying and pasting from ChatGPT, Cursor natively reads your entire codebase to write, refactor, and debug your Python/Java scripts across multiple files.
+            * **[LangChain](https://www.langchain.com/):** The absolute industry-standard framework for building AI agents that can browse the web and use external tools.
+            * **[AutoGPT](https://agpt.co/):** Experimental open-source agents that autonomously execute multi-step goals.
+            """)
+
+        with col2:
+            st.write("### 🔬 Academic Research & Literature")
+            st.markdown("""
+            * **[Perplexity AI](https://www.perplexity.ai/):** The ultimate AI search engine. It actually browses the web in real-time and heavily cites its academic sources.
+            * **[PapersWithCode](https://paperswithcode.com/):** The holy grail for ML students. It tracks trending AI research papers and links directly to their official GitHub repositories so you can see the math turned into actual code.
+            * **[Arxiv Sanity Preserver](http://arxiv-sanity.com/):** A brilliant tool built by Andrej Karpathy to help you filter and sort through the daily flood of new machine learning papers.
+            """)
+
+            st.write("### ⚙️ Hardware & Robotics Platforms")
+            st.markdown("""
+            * **[NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim):** Photorealistic robotics simulation. Highly useful for testing your drone and robotics logic virtually before deploying it to physical hardware.
+            * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
+            """)
