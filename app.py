@@ -94,10 +94,11 @@ def deep_analyze(title, snippet, link, academic_level):
     }
     headers = {'Content-Type': 'application/json'}
     
+    # FIXED: Replaced hallucinations with real Google Gemini models
     models_to_try = [
         "gemini-1.5-pro",         
-        "gemini-2.5-flash",       
-        "gemini-2.5-flash-lite"   
+        "gemini-1.5-flash",       
+        "gemini-1.5-flash-8b"   
     ]
     
     for model in models_to_try:
@@ -161,7 +162,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.2 (Dual-Engine Radar)")
+    st.caption("AI Opportunity Agent v18.3 (Smart Retry & Valid Models)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -217,8 +218,13 @@ else:
             
             analyzed = str(current_job.get('Analyzed', 'No'))
             
+            # --- FIXED: SMART RETRY LOGIC ---
             if analyzed != "Yes":
-                st.info("💡 **Raw Opportunity.** The AI has not extracted the requirements or checked your visa eligibility yet.")
+                if analyzed == "Failed":
+                    st.error("⚠️ The last AI analysis attempt failed due to server overload. You can try again.")
+                else:
+                    st.info("💡 **Raw Opportunity.** The AI has not extracted the requirements or checked your visa eligibility yet.")
+                
                 if st.button("🧠 Deep Analyze & Check Eligibility", use_container_width=True, type="primary"):
                     with st.spinner("Cascading through Gemini Models to check your visa status..."):
                         sponsor, eligibility, loc, deadline, reqs, contact, linkedin = deep_analyze(
@@ -232,7 +238,12 @@ else:
                         df.at[current_index, 'Requirements'] = reqs
                         df.at[current_index, 'Contact Name'] = contact
                         df.at[current_index, 'LinkedIn'] = linkedin
-                        df.at[current_index, 'Analyzed'] = "Yes"
+                        
+                        # THE FIX: Only lock the analysis if it actually worked!
+                        if sponsor == "Error":
+                            df.at[current_index, 'Analyzed'] = "Failed"
+                        else:
+                            df.at[current_index, 'Analyzed'] = "Yes"
                         
                         try:
                             df.to_csv(CSV_FILE, index=False, encoding='utf-8-sig')
