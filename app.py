@@ -14,8 +14,15 @@ st.set_page_config(page_title="Freshman AI Opportunity Agent", page_icon="🤖",
 CSV_FILE = "AI_Opportunities_Groq_Smart.csv"
 
 # --- SECRETS MANAGEMENT (CLOUD SAFE) ---
+# This ensures Google's bots don't lock your account again!
 SERPAPI_KEY = st.secrets["SERPAPI_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+
+# --- CHAT MEMORY SETUP ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's conquer Westlake University! How can I help you today?"}
+    ]
 
 # --- AI & SCRAPING FUNCTIONS ---
 def scrape_website_text(url):
@@ -128,6 +135,26 @@ def deep_analyze(title, snippet, link, academic_level):
             
     return "Error", "Error", "Error", "Error", "All models failed. Traffic is too high.", "Error", "Error"
 
+def ask_gemini_chat(chat_history):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    formatted_contents = []
+    for msg in chat_history:
+        role = "user" if msg["role"] == "user" else "model"
+        formatted_contents.append({"role": role, "parts": [{"text": msg["text"]}]})
+        
+    payload = {"contents": formatted_contents}
+    headers = {'Content-Type': 'application/json'}
+    
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=20)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            return f"API Error: {response.status_code}"
+    except Exception as e:
+        return f"Network Error: {str(e)}"
+
 def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
     try:
@@ -166,7 +193,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.8 (Full Cloud Build)")
+    st.caption("AI Opportunity Agent v19.0 (Cloud Chat Build)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -200,7 +227,8 @@ else:
         st.warning("Database empty. Use the sidebar to start a fast gather!")
         st.stop()
 
-    tab1, tab2 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet"])
+    # --- THE 3 TABS ---
+    tab1, tab2, tab3 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "💬 AI Assistant"])
 
     with tab1:
         pending_jobs = df[(df['Status'] == "")]
@@ -340,3 +368,26 @@ else:
     with tab2:
         st.write("### 🗄️ Your Full Opportunity Database")
         st.dataframe(df, use_container_width=True)
+
+    with tab3:
+        st.subheader("🧠 Your Personal AI Sandbox")
+        st.caption("Chat with Gemini 2.5 Flash directly from your app.")
+        
+        # Draw all previous chat messages
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["text"])
+                
+        # Chat input box
+        if prompt := st.chat_input("Ask me to write code, draft an email, or brainstorm..."):
+            
+            st.session_state.messages.append({"role": "user", "text": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                
+            with st.chat_message("model"):
+                with st.spinner("Thinking..."):
+                    response_text = ask_gemini_chat(st.session_state.messages)
+                    st.markdown(response_text)
+            
+            st.session_state.messages.append({"role": "model", "text": response_text})
