@@ -95,9 +95,9 @@ def deep_analyze(title, snippet, link, academic_level):
     headers = {'Content-Type': 'application/json'}
     
     models_to_try = [
-        "gemini-1.5-pro",       # The heavy-hitter (Tier 1)
-        "gemini-1.5-flash",     # The blazing-fast backup (Tier 2)
-        "gemini-1.5-flash-8b"   # The lightweight last resort (Tier 3)
+        "gemini-1.5-pro",         
+        "gemini-2.5-flash",       
+        "gemini-2.5-flash-lite"   
     ]
     
     for model in models_to_try:
