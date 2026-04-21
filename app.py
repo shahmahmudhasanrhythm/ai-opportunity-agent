@@ -7,6 +7,7 @@ import time
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
 
 st.set_page_config(page_title="Freshman AI Opportunity Agent", page_icon="🤖", layout="wide")
 
@@ -33,19 +34,35 @@ def extract_field(ai_text, field_name):
 
 def find_linkedin_profile(person_name, context):
     if person_name in ["Unknown", "Not Found", "None", "N/A", "Error", ""]: return "Not Found"
+    
+    # --- TIER 1: SerpApi (The VIP Google Search) ---
     try:
         query1 = f"{person_name} {context} LinkedIn"
         res1 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query1, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
-        for item in res1.get("organic_results", []):
-            if "linkedin.com/in/" in item.get("link", ""): return item["link"]
-            
-        query2 = f'"{person_name}" university AI LinkedIn'
-        res2 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query2, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
-        for item in res2.get("organic_results", []):
-            if "linkedin.com/in/" in item.get("link", ""): return item["link"]
-            
+        
+        if "error" not in res1: # If no quota error, use it
+            for item in res1.get("organic_results", []):
+                if "linkedin.com/in/" in item.get("link", ""): return item["link"]
+                
+            query2 = f'"{person_name}" university AI LinkedIn'
+            res2 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query2, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
+            for item in res2.get("organic_results", []):
+                if "linkedin.com/in/" in item.get("link", ""): return item["link"]
+            return "Not Found" 
+    except Exception:
+        pass # If SerpApi fails or is out of tokens, stay silent and drop to Tier 2
+
+    # --- TIER 2: DuckDuckGo (The Unlimited Free Backup) ---
+    try:
+        query = f"{person_name} {context} LinkedIn"
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3)) 
+            for item in results:
+                link = item.get("href", "")
+                if "linkedin.com/in/" in link: return link
         return "Not Found"
-    except Exception: return "Not Found"
+    except Exception: 
+        return "Not Found"
 
 def deep_analyze(title, snippet, link, academic_level):
     page_content = scrape_website_text(link)
@@ -144,7 +161,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Opportunity Agent v18.1 (Iframe Guard)")
+    st.caption("AI Opportunity Agent v18.2 (Dual-Engine Radar)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
