@@ -20,10 +20,45 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 # --- CHAT MEMORY SETUP ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's conquer Westlake! How can I help you today?"}
+        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's crush that Westlake interview! How can I help you today?"}
     ]
 
 # --- AI & SCRAPING FUNCTIONS ---
+def ask_gemini_raw(prompt, model="gemini-2.5-flash"):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    headers = {'Content-Type': 'application/json'}
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        if response.status_code == 200:
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+    except Exception: pass
+    return "Error generating report. Traffic might be too high."
+
+def get_live_intelligence():
+    search_query = "AI research internships lab positions freshman sophomore 2026 summer"
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(search_query, max_results=8))
+        
+        context = "\n".join([f"Title: {r['title']}\nSnippet: {r['body']}\nLink: {r['href']}" for r in results])
+        
+        prompt = f"""
+        You are a high-level intelligence agent for an AI student.
+        Analyze these latest search results from the past 24 hours and create a 'Global Intelligence Feed'.
+        
+        Format the output in beautiful Markdown:
+        1. 🏛️ ASIA FOCUS: Top 2 nearby opportunities.
+        2. 🌍 GLOBAL GEMS: 3 high-value internships in USA/Europe/Canada.
+        3. 🚀 TRENDING: 1-2 specialized AI courses or hackathons.
+        
+        Context:
+        {context}
+        """
+        return ask_gemini_raw(prompt)
+    except Exception as e:
+        return f"Could not retrieve live data: {str(e)}"
+
 def scrape_website_text(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -81,8 +116,7 @@ def deep_analyze(title, snippet, link, academic_level):
     
     STUDENT PROFILE: 
     - Nationality: Bangladeshi
-    - Current Visa: Chinese X1 Student Visa
-    - Location: Studying in China
+    - Current Visa: Chinese X1 Student Visa (Pending)
     - Academic Level: {academic_level}
     
     Analyze this web content and extract data into EXACTLY this format (keep to a single line per field):
@@ -194,7 +228,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v20.1 (Syntax Fix)")
+    st.caption("AI Command Center v21.0 (Full Live Edition)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -225,7 +259,7 @@ else:
     st.title("🔥 AI Command Center")
 
     # --- THE 5 TABS ---
-    tab1, tab2, tab5, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
 
     with tab1:
         if df.empty:
@@ -350,36 +384,21 @@ else:
         st.write("### 🗄️ Your Full Opportunity Database")
         st.dataframe(df, use_container_width=True)
 
-    with tab5:
-        st.subheader("📡 Global AI Opportunity Report | April 2026")
-        st.markdown("""
-        **🏛️ Westlake Internal Opportunities (High Priority)**
-        * **Project Spotlight:** Aerial Manipulation Robots (PI: Shiyu Zhao). Matches your drone-building background. Focuses on control and motion planning for micro aerial vehicles (MAVs).
-        * **Action:** Reach out directly to Shiyu Zhao via the School of Engineering to inquire about remaining lab assistant roles.
-
-        **🔬 Global Research & Industry Internships**
-        * **Microsoft Research (Redmond/Cambridge):** AI Safety, Hardware, & LLM Systems.
-        * **Salesforce (Palo Alto, CA):** AI Research Intern (Jun 2026). Applications closing in 28 days.
-        * **Sony (Reston, VA):** AI Adoption Intern. Closing in 7 days.
-        * **Cisco (Hybrid/San Francisco):** AI Research Scientist II.
-        * **OnePay (Remote/USA):** AI Research Intern. Pays ~$29/hour.
-
-        **🎓 Specialized Courses & Programs**
-        * **NYU Shanghai - AI Summer Program (July 13–24, 2026):** Looking for Undergraduate Peer-Assisted Learning Assistants. Great to network with Profs Shen and Tan.
-        * **AIIB Global Internship (Beijing):** Data Science interns for sustainable infrastructure. Stipend: USD 90/day + airfare.
-
-        **🚀 2026 Market Talent Shortages**
-        1. AI Security & Risk Analyst
-        2. Robotics & Automation (70% Shortage)
-        3. Generative AI Content/Tool Creator
-
-        **🇧🇩 Local Engagement (Bangladesh)**
-        * **May 16:** Int'l Conference on AI and Robotics Software Architecture (Dhaka).
-        * **June 11:** AI-enhanced Robotics Software Platforms (Rajshahi).
-        * **June 27:** AI in Epigenomics and Bioinformatics (Rangpur). *A great chance to network locally.*
-        """)
-
     with tab3:
+        st.subheader("📡 Live Global Intelligence Radar")
+        st.info("This tab uses DuckDuckGo to scan the live web for the newest postings from the past 24 hours.")
+        
+        if st.button("🚀 Trigger Live Global Radar", use_container_width=True):
+            with st.spinner("Intercepting global signals and generating report..."):
+                report = get_live_intelligence()
+                st.session_state.daily_report = report
+                st.markdown(report)
+        elif "daily_report" in st.session_state:
+            st.markdown(st.session_state.daily_report)
+        else:
+            st.write("Click the button above to generate today's fresh briefing.")
+
+    with tab4:
         st.subheader("🧠 Your Personal AI Sandbox")
         st.caption("Chat with Gemini directly from your app. The API handles traffic spikes automatically now!")
         
@@ -399,7 +418,7 @@ else:
             
             st.session_state.messages.append({"role": "model", "text": response_text})
 
-    with tab4:
+    with tab5:
         st.subheader("🧰 Your AI Engineering Toolbox")
         st.markdown("A curated directory of the most powerful LLMs, autonomous agents, and development platforms for your AI/ML journey.")
 
