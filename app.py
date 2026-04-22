@@ -12,6 +12,7 @@ from duckduckgo_search import DDGS
 st.set_page_config(page_title="Freshman AI Opportunity Agent", page_icon="🤖", layout="wide")
 
 CSV_FILE = "AI_Opportunities_Groq_Smart.csv"
+TOOLBOX_CSV = "AI_Toolbox_Data.csv"
 
 # --- SECRETS MANAGEMENT (CLOUD SAFE) ---
 SERPAPI_KEY = st.secrets["SERPAPI_KEY"]
@@ -206,6 +207,63 @@ def ask_gemini_chat(chat_history):
             
     return "⏳ Whoa there! We've hit the Google free-tier speed limit. Give it exactly 60 seconds to cool down, and try asking me again!"
 
+# --- NEW TOOLBOX FUNCTIONS ---
+def analyze_new_tool(url):
+    page_content = scrape_website_text(url)
+    
+    prompt = f"""
+    You are an AI tool analyst. A student wants to add this URL to their AI Toolbox.
+    Based on the website content, extract exactly:
+    NAME: [Name of the tool or company]
+    CATEGORY: [Choose ONE: LLMs & Chatbots, Coding & Agents, Research & Data, Hardware & Simulation, Other]
+    DESCRIPTION: [A punchy 1-2 sentence description of what it does and why an AI student needs it]
+    
+    Website Content: {page_content[:10000]}
+    """
+    
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    headers = {'Content-Type': 'application/json'}
+    
+    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+    
+    for model in models_to_try:
+        url_api = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            response = requests.post(url_api, json=payload, headers=headers, timeout=20)
+            if response.status_code == 200:
+                resp = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+                
+                name = extract_field(resp, "NAME")
+                cat = extract_field(resp, "CATEGORY")
+                desc = extract_field(resp, "DESCRIPTION")
+                return name, cat, desc
+            else:
+                continue
+        except Exception: 
+            continue
+            
+    return "Unknown Tool", "Other", "Could not analyze the website. It might be actively blocking AI scrapers."
+
+def load_toolbox_data():
+    if not os.path.exists(TOOLBOX_CSV):
+        # Create a default database if it doesn't exist yet
+        default_tools = pd.DataFrame([
+            {"Name": "Claude", "URL": "https://claude.ai", "Category": "LLMs & Chatbots", "Description": "Currently the industry heavy-hitter for advanced coding and complex logic."},
+            {"Name": "Groq", "URL": "https://groq.com", "Category": "LLMs & Chatbots", "Description": "The fastest AI inference engine on earth (powered by LPU hardware)."},
+            {"Name": "Cursor IDE", "URL": "https://cursor.sh", "Category": "Coding & Agents", "Description": "An AI-first code editor that natively reads your entire codebase."},
+            {"Name": "Perplexity AI", "URL": "https://www.perplexity.ai", "Category": "Research & Data", "Description": "The ultimate AI search engine that browses the web and cites academic sources."},
+            {"Name": "PapersWithCode", "URL": "https://paperswithcode.com", "Category": "Research & Data", "Description": "Tracks trending AI research papers and links directly to their GitHub repositories."},
+            {"Name": "Hugging Face", "URL": "https://huggingface.co", "Category": "Coding & Agents", "Description": "The GitHub of AI. Access open-source models, datasets, and spaces."},
+            {"Name": "NVIDIA Isaac Sim", "URL": "https://developer.nvidia.com/isaac-sim", "Category": "Hardware & Simulation", "Description": "Photorealistic robotics simulation for testing drone and robotics logic."}
+        ])
+        default_tools.to_csv(TOOLBOX_CSV, index=False, encoding='utf-8-sig')
+        return default_tools
+    
+    try:
+        return pd.read_csv(TOOLBOX_CSV, dtype=str).fillna("")
+    except Exception:
+        return pd.DataFrame(columns=["Name", "URL", "Category", "Description"])
+
 def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
     try:
@@ -220,7 +278,6 @@ def load_data():
 
 # --- SIDEBAR ---
 with st.sidebar:
-    # --- YOUR AVATAR LOGIC KEPT INTACT ---
     if os.path.exists("profile.jpg"):
         st.image("profile.jpg", caption="Director: Rhythm", use_container_width=True)
     
@@ -248,7 +305,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v21.2 (Classic UI Revert)")
+    st.caption("AI Command Center v23.1 (Full Expanded Code)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -279,7 +336,7 @@ else:
     st.title("🔥 AI Command Center")
 
     # --- THE 5 TABS ---
-    tab1, tab2, tab5, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
 
     with tab1:
         if df.empty:
@@ -404,7 +461,7 @@ else:
         st.write("### 🗄️ Your Full Opportunity Database")
         st.dataframe(df, use_container_width=True)
 
-    with tab5:
+    with tab3:
         st.subheader("📡 Live Global Intelligence Radar")
         st.info("This tab scans the live web for the newest postings from the past 24 hours.")
         
@@ -418,7 +475,7 @@ else:
         else:
             st.write("Click the button above to generate today's fresh briefing.")
 
-    with tab3:
+    with tab4:
         st.subheader("🧠 Your Personal AI Sandbox")
         st.caption("Chat with Gemini directly from your app. The API handles traffic spikes automatically now!")
         
@@ -438,37 +495,67 @@ else:
             
             st.session_state.messages.append({"role": "model", "text": response_text})
 
-    with tab4:
-        st.subheader("🧰 Your AI Engineering Toolbox")
-        st.markdown("A curated directory of the most powerful LLMs, autonomous agents, and development platforms for your AI/ML journey.")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.write("### 🧠 Advanced LLMs & Interfaces")
-            st.markdown("""
-            * **[Claude (by Anthropic)](https://claude.ai):** Currently the industry heavy-hitter for advanced coding, complex logic, and long-context analysis.
-            * **[Groq](https://groq.com/):** The fastest AI inference engine on earth (powered by LPU hardware). Perfect for when you build real-time voice or text applications.
-            * **[Hugging Face Chat](https://huggingface.co/chat/):** Free access to top open-source models like Llama 3 and Mistral. It's essentially the GitHub of AI.
-            * **[OpenAI Platform](https://platform.openai.com/):** The backend dashboard for GPT-4o. Great for building multimodal vision and audio apps.
-            """)
-
-            st.write("### 💻 AI Coding & Agents")
-            st.markdown("""
-            * **[Cursor IDE](https://cursor.sh/):** An AI-first code editor. Instead of copying and pasting from ChatGPT, Cursor natively reads your entire codebase to write, refactor, and debug your Python/Java scripts across multiple files.
-            * **[LangChain](https://www.langchain.com/):** The absolute industry-standard framework for building AI agents that can browse the web and use external tools.
-            * **[AutoGPT](https://agpt.co/):** Experimental open-source agents that autonomously execute multi-step goals.
-            """)
-
-        with col2:
-            st.write("### 🔬 Academic Research & Literature")
-            st.markdown("""
-            * **[Perplexity AI](https://www.perplexity.ai/):** The ultimate AI search engine. It actually browses the web in real-time and heavily cites its academic sources.
-            * **[PapersWithCode](https://paperswithcode.com/):** The holy grail for ML students. It tracks trending AI research papers and links directly to their official GitHub repositories so you can see the math turned into actual code.
-            * **[Arxiv Sanity Preserver](http://arxiv-sanity.com/):** A brilliant tool built by Andrej Karpathy to help you filter and sort through the daily flood of new machine learning papers.
-            """)
-
-            st.write("### ⚙️ Hardware & Robotics Platforms")
-            st.markdown("""
-            * **[NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim):** Photorealistic robotics simulation. Highly useful for testing your drone and robotics logic virtually before deploying it to physical hardware.
-            * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
-            """)
+    with tab5:
+        st.subheader("🧰 Dynamic AI Toolbox")
+        st.markdown("Your custom, growing library of AI agents, LLMs, and research tools.")
+        
+        # --- NEW: ADD A TOOL (AI AUTO-ANALYZE) ---
+        with st.expander("➕ Add a New Tool to Your Library", expanded=False):
+            new_tool_url = st.text_input("Paste the URL of a new AI tool you found:")
+            if st.button("Analyze & Add Tool"):
+                if new_tool_url:
+                    with st.spinner("Agent is reading the website and extracting data..."):
+                        t_name, t_cat, t_desc = analyze_new_tool(new_tool_url)
+                        
+                        if t_name not in ["Error", "Unknown Tool"]:
+                            new_row = pd.DataFrame([{
+                                "Name": t_name, 
+                                "URL": new_tool_url, 
+                                "Category": t_cat, 
+                                "Description": t_desc
+                            }])
+                            
+                            tb_df = load_toolbox_data()
+                            tb_df = pd.concat([tb_df, new_row], ignore_index=True)
+                            
+                            try:
+                                tb_df.to_csv(TOOLBOX_CSV, index=False, encoding='utf-8-sig')
+                                st.success(f"Successfully scraped! Added **{t_name}** to {t_cat}.")
+                                time.sleep(1)
+                                st.rerun()
+                            except PermissionError:
+                                st.error("🚨 Close Excel or CSV file to save new tool!")
+                        else:
+                            st.error(t_desc)
+                            
+        # --- DISPLAY TOOLS GRID ---
+        tb_df = load_toolbox_data()
+        
+        if not tb_df.empty:
+            categories = tb_df['Category'].unique()
+            
+            for cat in categories:
+                st.write(f"### {cat}")
+                cat_tools = tb_df[tb_df['Category'] == cat]
+                
+                cols = st.columns(3)
+                for i, row in cat_tools.reset_index().iterrows():
+                    with cols[i % 3]:
+                        st.markdown(f"**[{row['Name']}]({row['URL']})**")
+                        st.caption(row['Description'])
+                        
+                        if st.button(f"Launch {row['Name']}", key=f"launch_{row['Name']}_{i}"):
+                            st.session_state.active_tool_url = row['URL']
+                            st.session_state.active_tool_name = row['Name']
+                            
+                st.write("---")
+                
+        # --- EMBEDDED LAUNCHPAD ---
+        if "active_tool_url" in st.session_state:
+            st.write(f"### 🚀 Embedded View: {st.session_state.active_tool_name}")
+            st.caption(f"**Note:** High-security websites block embedding to prevent clickjacking. If the box below is grey or refuses to connect, click here to open it normally: **[{st.session_state.active_tool_url}]({st.session_state.active_tool_url})**")
+            
+            try:
+                st.components.v1.iframe(st.session_state.active_tool_url, height=700, scrolling=True)
+            except Exception:
+                st.error("This website explicitly blocks embedding.")
