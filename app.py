@@ -246,15 +246,31 @@ def analyze_new_tool(url):
 
 def load_toolbox_data():
     if not os.path.exists(TOOLBOX_CSV):
-        # Create a default database if it doesn't exist yet
+        # Expanded Default Database with more AI Tools
         default_tools = pd.DataFrame([
+            # LLMs & Chatbots
             {"Name": "Claude", "URL": "https://claude.ai", "Category": "LLMs & Chatbots", "Description": "Currently the industry heavy-hitter for advanced coding and complex logic."},
+            {"Name": "ChatGPT", "URL": "https://chatgpt.com", "Category": "LLMs & Chatbots", "Description": "OpenAI's flagship conversational AI and reasoning engine."},
             {"Name": "Groq", "URL": "https://groq.com", "Category": "LLMs & Chatbots", "Description": "The fastest AI inference engine on earth (powered by LPU hardware)."},
+            {"Name": "Gemini", "URL": "https://gemini.google.com", "Category": "LLMs & Chatbots", "Description": "Google's multimodal AI, deeply integrated with Workspace tools."},
+            
+            # Coding & Agents
             {"Name": "Cursor IDE", "URL": "https://cursor.sh", "Category": "Coding & Agents", "Description": "An AI-first code editor that natively reads your entire codebase."},
+            {"Name": "GitHub Copilot", "URL": "https://github.com/features/copilot", "Category": "Coding & Agents", "Description": "The ubiquitous AI pair programmer embedded directly in VS Code."},
+            {"Name": "LangChain", "URL": "https://www.langchain.com", "Category": "Coding & Agents", "Description": "The industry standard framework for building AI agents that use tools."},
+            {"Name": "Hugging Face", "URL": "https://huggingface.co", "Category": "Coding & Agents", "Description": "The GitHub of AI. Access open-source models, datasets, and server spaces."},
+            
+            # Research & Data
             {"Name": "Perplexity AI", "URL": "https://www.perplexity.ai", "Category": "Research & Data", "Description": "The ultimate AI search engine that browses the web and cites academic sources."},
             {"Name": "PapersWithCode", "URL": "https://paperswithcode.com", "Category": "Research & Data", "Description": "Tracks trending AI research papers and links directly to their GitHub repositories."},
-            {"Name": "Hugging Face", "URL": "https://huggingface.co", "Category": "Coding & Agents", "Description": "The GitHub of AI. Access open-source models, datasets, and spaces."},
-            {"Name": "NVIDIA Isaac Sim", "URL": "https://developer.nvidia.com/isaac-sim", "Category": "Hardware & Simulation", "Description": "Photorealistic robotics simulation for testing drone and robotics logic."}
+            {"Name": "Elicit", "URL": "https://elicit.com", "Category": "Research & Data", "Description": "An AI research assistant that extracts data and findings from academic papers."},
+            
+            # Hardware & Simulation
+            {"Name": "NVIDIA Isaac Sim", "URL": "https://developer.nvidia.com/isaac-sim", "Category": "Hardware & Simulation", "Description": "Photorealistic robotics simulation for testing drone and robotics logic."},
+            {"Name": "Google Colab", "URL": "https://colab.research.google.com", "Category": "Hardware & Simulation", "Description": "Free cloud GPUs for training machine learning models in Jupyter notebooks."},
+            
+            # Other
+            {"Name": "Midjourney", "URL": "https://www.midjourney.com", "Category": "Other", "Description": "State-of-the-art AI image and creative asset generation."}
         ])
         default_tools.to_csv(TOOLBOX_CSV, index=False, encoding='utf-8-sig')
         return default_tools
@@ -305,7 +321,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v23.1 (Full Expanded Code)")
+    st.caption("AI Command Center v24.0 (Expanded Toolbox & Links)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -499,7 +515,7 @@ else:
         st.subheader("🧰 Dynamic AI Toolbox")
         st.markdown("Your custom, growing library of AI agents, LLMs, and research tools.")
         
-        # --- NEW: ADD A TOOL (AI AUTO-ANALYZE) ---
+        # --- ADD A TOOL (AI AUTO-ANALYZE) ---
         with st.expander("➕ Add a New Tool to Your Library", expanded=False):
             new_tool_url = st.text_input("Paste the URL of a new AI tool you found:")
             if st.button("Analyze & Add Tool"):
@@ -528,7 +544,7 @@ else:
                         else:
                             st.error(t_desc)
                             
-        # --- DISPLAY TOOLS GRID ---
+        # --- DISPLAY TOOLS GRID WITH DIRECT LINKS ---
         tb_df = load_toolbox_data()
         
         if not tb_df.empty:
@@ -541,21 +557,10 @@ else:
                 cols = st.columns(3)
                 for i, row in cat_tools.reset_index().iterrows():
                     with cols[i % 3]:
-                        st.markdown(f"**[{row['Name']}]({row['URL']})**")
+                        st.markdown(f"**{row['Name']}**")
                         st.caption(row['Description'])
                         
-                        if st.button(f"Launch {row['Name']}", key=f"launch_{row['Name']}_{i}"):
-                            st.session_state.active_tool_url = row['URL']
-                            st.session_state.active_tool_name = row['Name']
+                        # THE FIX: Streamlit's native link_button opens safely in a new tab
+                        st.link_button(f"🚀 Launch {row['Name']}", row['URL'], use_container_width=True)
                             
                 st.write("---")
-                
-        # --- EMBEDDED LAUNCHPAD ---
-        if "active_tool_url" in st.session_state:
-            st.write(f"### 🚀 Embedded View: {st.session_state.active_tool_name}")
-            st.caption(f"**Note:** High-security websites block embedding to prevent clickjacking. If the box below is grey or refuses to connect, click here to open it normally: **[{st.session_state.active_tool_url}]({st.session_state.active_tool_url})**")
-            
-            try:
-                st.components.v1.iframe(st.session_state.active_tool_url, height=700, scrolling=True)
-            except Exception:
-                st.error("This website explicitly blocks embedding.")
