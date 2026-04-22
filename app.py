@@ -20,21 +20,10 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 # --- CHAT MEMORY SETUP ---
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Let's crush that Westlake interview! How can I help you today?"}
+        {"role": "model", "text": "Hi Rhythm! I'm your embedded assistant. Ready to hunt for new AI opportunities?"}
     ]
 
 # --- AI & SCRAPING FUNCTIONS ---
-def ask_gemini_raw(prompt, model="gemini-2.5-flash"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {'Content-Type': 'application/json'}
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-    except Exception: pass
-    return "Error generating report. Traffic might be too high."
-
 def get_live_intelligence():
     search_query = "AI research internships lab positions freshman sophomore 2026 summer"
     try:
@@ -42,9 +31,8 @@ def get_live_intelligence():
             results = list(ddgs.text(search_query, max_results=8))
         context = "\n".join([f"Title: {r['title']}\nSnippet: {r['body']}\nLink: {r['href']}" for r in results])
     except Exception:
-        context = "" # If the scraper is blocked, we send an empty string
+        context = "" 
     
-    # THE FIX: Stricter prompt that forbids empty templates
     prompt = f"""
     You are an elite intelligence agent for a freshman AI student at Westlake University.
     Create a 'Global Intelligence Feed' for today. 
@@ -66,18 +54,28 @@ def get_live_intelligence():
     {context}
     """
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     headers = {'Content-Type': 'application/json'}
     
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        if response.status_code == 200:
-            return response.json()['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return f"Error connecting to AI: Code {response.status_code}"
-    except Exception as e: 
-        return f"Network Error: {str(e)}"
+    # THE FIX: Added the Bulletproof Cascade to handle 503s and 429s!
+    models_to_try = [
+        "gemini-2.5-flash",         
+        "gemini-2.5-pro",
+        "gemini-2.5-flash-lite"
+    ]
+    
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            if response.status_code == 200:
+                return response.json()['candidates'][0]['content']['parts'][0]['text']
+            else:
+                continue # If it gets a 503 or 429, skip and try the next model!
+        except Exception: 
+            continue
+            
+    return "⏳ Google's servers are currently overloaded (Error 503/429). Please wait a moment and click the radar button again!"
 
 def scrape_website_text(url):
     try:
@@ -98,7 +96,6 @@ def extract_field(ai_text, field_name):
 def find_linkedin_profile(person_name, context):
     if person_name in ["Unknown", "Not Found", "None", "N/A", "Error", ""]: return "Not Found"
     
-    # --- TIER 1: SerpApi ---
     try:
         query1 = f"{person_name} {context} LinkedIn"
         res1 = requests.get("https://serpapi.com/search.json", params={"engine": "google", "q": query1, "api_key": SERPAPI_KEY, "num": 3}, timeout=5).json()
@@ -115,7 +112,6 @@ def find_linkedin_profile(person_name, context):
     except Exception:
         pass 
 
-    # --- TIER 2: DuckDuckGo ---
     try:
         query = f"{person_name} {context} LinkedIn"
         with DDGS() as ddgs:
@@ -136,7 +132,8 @@ def deep_analyze(title, snippet, link, academic_level):
     
     STUDENT PROFILE: 
     - Nationality: Bangladeshi
-    - Current Visa: Chinese X1 Student Visa (Pending)
+    - Current Visa: Chinese X1 Student Visa
+    - Location: Studying in China
     - Academic Level: {academic_level}
     
     Analyze this web content and extract data into EXACTLY this format (keep to a single line per field):
@@ -248,7 +245,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v21.0 (Full Live Edition)")
+    st.caption("AI Command Center v21.1 (503 Cascade Fix)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -279,7 +276,7 @@ else:
     st.title("🔥 AI Command Center")
 
     # --- THE 5 TABS ---
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
+    tab1, tab2, tab5, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
 
     with tab1:
         if df.empty:
@@ -404,12 +401,12 @@ else:
         st.write("### 🗄️ Your Full Opportunity Database")
         st.dataframe(df, use_container_width=True)
 
-    with tab3:
+    with tab5:
         st.subheader("📡 Live Global Intelligence Radar")
-        st.info("This tab uses DuckDuckGo to scan the live web for the newest postings from the past 24 hours.")
+        st.info("This tab scans the live web for the newest postings from the past 24 hours.")
         
         if st.button("🚀 Trigger Live Global Radar", use_container_width=True):
-            with st.spinner("Intercepting global signals and generating report..."):
+            with st.spinner("Intercepting global signals..."):
                 report = get_live_intelligence()
                 st.session_state.daily_report = report
                 st.markdown(report)
@@ -418,7 +415,7 @@ else:
         else:
             st.write("Click the button above to generate today's fresh briefing.")
 
-    with tab4:
+    with tab3:
         st.subheader("🧠 Your Personal AI Sandbox")
         st.caption("Chat with Gemini directly from your app. The API handles traffic spikes automatically now!")
         
@@ -438,7 +435,7 @@ else:
             
             st.session_state.messages.append({"role": "model", "text": response_text})
 
-    with tab5:
+    with tab4:
         st.subheader("🧰 Your AI Engineering Toolbox")
         st.markdown("A curated directory of the most powerful LLMs, autonomous agents, and development platforms for your AI/ML journey.")
 
