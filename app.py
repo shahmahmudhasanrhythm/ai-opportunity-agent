@@ -268,12 +268,18 @@ with st.sidebar:
         st.write(f"✅ Shortlisted: {len(current_df[current_df['Status'] == 'Shortlisted'])}")
         st.write(f"❌ Passed: {len(current_df[current_df['Status'] == 'Passed'])}")
     
-    st.write("---")
     st.write("### ⚠️ Danger Zone")
     if st.button("🗑️ Wipe Database", type="primary", use_container_width=True):
-        if os.path.exists(CSV_FILE): os.remove(CSV_FILE)
-        st.success("Database wiped locally! It will re-sync blank on next gather.")
-        st.rerun()
+        with st.spinner("Purging Cloud Database..."):
+            # 1. Create a perfectly blank matrix with the right column headers
+            empty_df = pd.DataFrame(columns=['Opportunity Name', 'Description Snippet', 'Direct Link', 'Status', 'Sponsorship', 'Eligibility', 'Location', 'Deadline', 'Requirements', 'Contact Name', 'LinkedIn', 'Analyzed'])
+            
+            # 2. Push the blank matrix straight to GitHub to overwrite the old one!
+            save_to_github(empty_df, CSV_FILE)
+            
+            st.success("Cloud Purge Complete! The opportunity deck is permanently wiped.")
+            time.sleep(1.5)
+            st.rerun()
             
     st.caption("AI Command Center v25.0 (Permanent DB Edition)")
 
