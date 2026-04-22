@@ -194,7 +194,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v20.0 (Global Intelligence)")
+    st.caption("AI Command Center v20.1 (Syntax Fix)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -433,6 +433,3 @@ else:
             * **[NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim):** Photorealistic robotics simulation. Highly useful for testing your drone and robotics logic virtually before deploying it to physical hardware.
             * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
             """)
-``` * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
-            """)
-http://googleusercontent.com/task_confirmation_content/0
