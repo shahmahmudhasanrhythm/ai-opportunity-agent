@@ -194,7 +194,7 @@ with st.sidebar:
             st.rerun()
         except PermissionError: st.error("🚨 Close Excel!")
             
-    st.caption("AI Command Center v1.0")
+    st.caption("AI Command Center v20.0 (Global Intelligence)")
 
 # --- MAIN SCREEN LOGIC ---
 if run_search:
@@ -224,8 +224,8 @@ else:
     df = load_data()
     st.title("🔥 AI Command Center")
 
-    # --- THE 4 TABS ---
-    tab1, tab2, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "💬 AI Assistant", "🧰 AI Toolbox"])
+    # --- THE 5 TABS ---
+    tab1, tab2, tab5, tab3, tab4 = st.tabs(["🃏 Swipe Deck", "📊 Master Sheet", "📡 Intelligence Feed", "💬 AI Assistant", "🧰 AI Toolbox"])
 
     with tab1:
         if df.empty:
@@ -350,6 +350,35 @@ else:
         st.write("### 🗄️ Your Full Opportunity Database")
         st.dataframe(df, use_container_width=True)
 
+    with tab5:
+        st.subheader("📡 Global AI Opportunity Report | April 2026")
+        st.markdown("""
+        **🏛️ Westlake Internal Opportunities (High Priority)**
+        * **Project Spotlight:** Aerial Manipulation Robots (PI: Shiyu Zhao). Matches your drone-building background. Focuses on control and motion planning for micro aerial vehicles (MAVs).
+        * **Action:** Reach out directly to Shiyu Zhao via the School of Engineering to inquire about remaining lab assistant roles.
+
+        **🔬 Global Research & Industry Internships**
+        * **Microsoft Research (Redmond/Cambridge):** AI Safety, Hardware, & LLM Systems.
+        * **Salesforce (Palo Alto, CA):** AI Research Intern (Jun 2026). Applications closing in 28 days.
+        * **Sony (Reston, VA):** AI Adoption Intern. Closing in 7 days.
+        * **Cisco (Hybrid/San Francisco):** AI Research Scientist II.
+        * **OnePay (Remote/USA):** AI Research Intern. Pays ~$29/hour.
+
+        **🎓 Specialized Courses & Programs**
+        * **NYU Shanghai - AI Summer Program (July 13–24, 2026):** Looking for Undergraduate Peer-Assisted Learning Assistants. Great to network with Profs Shen and Tan.
+        * **AIIB Global Internship (Beijing):** Data Science interns for sustainable infrastructure. Stipend: USD 90/day + airfare.
+
+        **🚀 2026 Market Talent Shortages**
+        1. AI Security & Risk Analyst
+        2. Robotics & Automation (70% Shortage)
+        3. Generative AI Content/Tool Creator
+
+        **🇧🇩 Local Engagement (Bangladesh)**
+        * **May 16:** Int'l Conference on AI and Robotics Software Architecture (Dhaka).
+        * **June 11:** AI-enhanced Robotics Software Platforms (Rajshahi).
+        * **June 27:** AI in Epigenomics and Bioinformatics (Rangpur). *A great chance to network locally.*
+        """)
+
     with tab3:
         st.subheader("🧠 Your Personal AI Sandbox")
         st.caption("Chat with Gemini directly from your app. The API handles traffic spikes automatically now!")
@@ -404,3 +433,5 @@ else:
             * **[NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim):** Photorealistic robotics simulation. Highly useful for testing your drone and robotics logic virtually before deploying it to physical hardware.
             * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
             """)
+``` Ask me to edit or delete your scheduled action at any time.
+http://googleusercontent.com/task_confirmation_content/0
