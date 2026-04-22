@@ -433,5 +433,6 @@ else:
             * **[NVIDIA Isaac Sim](https://developer.nvidia.com/isaac-sim):** Photorealistic robotics simulation. Highly useful for testing your drone and robotics logic virtually before deploying it to physical hardware.
             * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
             """)
-``` Ask me to edit or delete your scheduled action at any time.
+``` * **[Google Colab](https://colab.research.google.com/):** Free cloud GPUs. When your laptop can't handle training a massive neural network, you run your Python code here.
+            """)
 http://googleusercontent.com/task_confirmation_content/0
