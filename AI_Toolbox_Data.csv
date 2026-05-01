@@ -1,0 +1,15 @@
+Name,URL,Category,Description
+Claude,https://claude.ai,LLMs & Chatbots,Currently the industry heavy-hitter for advanced coding and complex logic.
+ChatGPT,https://chatgpt.com,LLMs & Chatbots,OpenAI's flagship conversational AI and reasoning engine.
+Groq,https://groq.com,LLMs & Chatbots,The fastest AI inference engine on earth (powered by LPU hardware).
+Gemini,https://gemini.google.com,LLMs & Chatbots,"Google's multimodal AI, deeply integrated with Workspace tools."
+Cursor IDE,https://cursor.sh,Coding & Agents,An AI-first code editor that natively reads your entire codebase.
+GitHub Copilot,https://github.com/features/copilot,Coding & Agents,The ubiquitous AI pair programmer embedded directly in VS Code.
+LangChain,https://www.langchain.com,Coding & Agents,The industry standard framework for building AI agents that use tools.
+Hugging Face,https://huggingface.co,Coding & Agents,"The GitHub of AI. Access open-source models, datasets, and server spaces."
+Perplexity AI,https://www.perplexity.ai,Research & Data,The ultimate AI search engine that browses the web and cites academic sources.
+PapersWithCode,https://paperswithcode.com,Research & Data,Tracks trending AI research papers and links directly to their GitHub repositories.
+Elicit,https://elicit.com,Research & Data,An AI research assistant that extracts data and findings from academic papers.
+NVIDIA Isaac Sim,https://developer.nvidia.com/isaac-sim,Hardware & Simulation,Photorealistic robotics simulation for testing drone and robotics logic.
+Google Colab,https://colab.research.google.com,Hardware & Simulation,Free cloud GPUs for training machine learning models in Jupyter notebooks.
+Midjourney,https://www.midjourney.com,Other,State-of-the-art AI image and creative asset generation.
