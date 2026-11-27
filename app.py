@@ -7,8 +7,11 @@ import time
 import requests
 import urllib.parse
 import base64
-from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
+
+from agent.config import OPPORTUNITY_COLUMNS
+from agent.extraction import build_analysis_prompt, parse_fields, scrape_website_text
+from agent.gemini import generate
 
 st.set_page_config(page_title="Freshman AI Opportunity Agent", page_icon="🤖", layout="wide")
 
@@ -18,6 +21,8 @@ TOOLBOX_CSV = "AI_Toolbox_Data.csv"
 # --- SECRETS MANAGEMENT (CLOUD SAFE) ---
 SERPAPI_KEY = st.secrets["SERPAPI_KEY"]
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+# Optional [profile] section in secrets.toml lets other students use the app for themselves.
+STUDENT_PROFILE = dict(st.secrets.get("profile", {}))
 
 # --- CHAT MEMORY SETUP ---
 if "messages" not in st.session_state:
@@ -59,63 +64,36 @@ def save_to_github(dataframe, filename):
 
 # --- AI & SCRAPING FUNCTIONS ---
 def get_live_intelligence():
-    search_query = "AI research internships lab positions freshman sophomore 2026 summer"
+    search_query = "AI research internships lab positions freshman sophomore summer"
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(search_query, max_results=8))
-        context = "\n".join([f"Title: {r['title']}\nSnippet: {r['body']}\nLink: {r['href']}" for r in results])
     except Exception:
-        context = "" 
-    
+        results = []
+
+    # The old prompt told Gemini to make up "highly realistic" opportunities when the
+    # search came back empty. For an internship tool that is the worst possible failure:
+    # you could spend an evening preparing for a program that doesn't exist.
+    if not results:
+        return "📭 The live search returned nothing right now. Try again in a few minutes."
+
+    context = "\n".join(f"Title: {r['title']}\nSnippet: {r['body']}\nLink: {r['href']}" for r in results)
     prompt = f"""
-    You are an elite intelligence agent for a freshman AI student at Westlake University.
-    Create a 'Global Intelligence Feed' for today. 
-    
-    CRITICAL INSTRUCTION: If the Context below is empty, YOU MUST generate a highly realistic, detailed report based on your own internal knowledge of the 2026 AI industry. 
-    DO NOT output placeholders like "(Awaiting data)". You must provide actual company names, real lab structures, and actionable descriptions.
-    
-    Format exactly like this in Markdown:
+    You are an intelligence agent for a first-year AI student at Westlake University.
+    Write a short 'Global Intelligence Feed' using ONLY the search results below.
+    Every item must come from the results and include its link. Do not add anything
+    from your own knowledge. If a section has no matching results, write "Nothing today."
+
+    Format in Markdown:
     ### 🏛️ WESTLAKE & ASIA FOCUS
-    [List 2 real or highly realistic lab opportunities]
-    
     ### 🌍 GLOBAL GEMS
-    [List 3 high-value internships in USA/Europe/Canada (e.g., Microsoft, Google, etc.)]
-    
-    ### 🚀 TRENDING
-    [List 1-2 specialized AI courses or hackathons]
-    
-    Context from live search:
+    ### 🚀 TRENDING (courses, hackathons)
+
+    Search results:
     {context}
     """
-    
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {'Content-Type': 'application/json'}
-    
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=30)
-            if response.status_code == 200:
-                return response.json()['candidates'][0]['content']['parts'][0]['text']
-        except Exception: continue
-    return "⏳ Google's servers are currently overloaded (Error 503/429). Please wait a moment and click the radar button again!"
-
-def scrape_website_text(url):
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            for script in soup(["script", "style", "nav", "footer"]): script.extract()
-            return soup.get_text(separator=' ', strip=True)[:15000] 
-    except Exception: pass
-    return ""
-
-def extract_field(ai_text, field_name):
-    for line in ai_text.split('\n'):
-        if line.upper().startswith(field_name): return line.split(":", 1)[-1].strip()
-    return "Not Found"
+    report = generate(prompt, GEMINI_API_KEY, timeout=30)
+    return report or "⏳ Google's servers are busy (rate limit or overload). Wait a minute and try again."
 
 def find_linkedin_profile(person_name, context):
     if person_name in ["Unknown", "Not Found", "None", "N/A", "Error", ""]: return "Not Found"
@@ -138,59 +116,19 @@ def find_linkedin_profile(person_name, context):
 
 def deep_analyze(title, snippet, link, academic_level):
     page_content = scrape_website_text(link)
-    if len(page_content) < 100: page_content = snippet 
-    prompt = f"""
-    You are an elite data extraction analyst advising a university student.
-    
-    STUDENT PROFILE: 
-    - Nationality: Bangladeshi
-    - Current Visa: Chinese X1 Student Visa
-    - Location: Studying in China
-    - Academic Level: {academic_level}
-    
-    Analyze this web content and extract data into EXACTLY this format:
-    SPONSORSHIP: [Mentions Visa sponsorship or International eligibility? 3-4 words or "Unknown"]
-    ELIGIBILITY: [Can this specific student apply? Start with "Yes", "No", or "Unclear", followed by a 1-sentence reason based on their profile]
-    LOCATION: [In-Person / Remote / Hybrid / Unknown]
-    DEADLINE: [Extract Exact Date / "Rolling" / "Unknown"]
-    REQUIREMENTS: [Highly concise list of requirements found. If none, write "Not explicitly listed"]
-    CONTACT: [Extract ONLY the name of the supervising professor, PI, or director. If none, write "Unknown"]
-    
-    Title: {title}
-    Website Content: {page_content}
-    """
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {'Content-Type': 'application/json'}
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite"]
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=15)
-            if response.status_code == 200:
-                resp = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-                sponsor = extract_field(resp, "SPONSORSHIP")
-                eligibility = extract_field(resp, "ELIGIBILITY")
-                loc = extract_field(resp, "LOCATION")
-                deadline = extract_field(resp, "DEADLINE")
-                reqs = extract_field(resp, "REQUIREMENTS")
-                contact = extract_field(resp, "CONTACT")
-                return sponsor, eligibility, loc, deadline, reqs, contact, find_linkedin_profile(contact, title)
-        except Exception: continue
-    return "Error", "Error", "Error", "Error", "All models failed. Traffic is too high.", "Error", "Error"
+    if len(page_content) < 100: page_content = snippet
+    prompt = build_analysis_prompt(title, page_content, academic_level, STUDENT_PROFILE)
+    resp = generate(prompt, GEMINI_API_KEY, timeout=15)
+    if resp is None:
+        return "Error", "Error", "Error", "Error", "All models failed. Traffic is too high.", "Error", "Error"
+    f = parse_fields(resp)
+    return (f["SPONSORSHIP"], f["ELIGIBILITY"], f["LOCATION"], f["DEADLINE"],
+            f["REQUIREMENTS"], f["CONTACT"], find_linkedin_profile(f["CONTACT"], title))
 
 def ask_gemini_chat(chat_history):
-    formatted_contents = [{"role": "user" if msg["role"] == "user" else "model", "parts": [{"text": msg["text"]}]} for msg in chat_history]
-    payload = {"contents": formatted_contents}
-    headers = {'Content-Type': 'application/json'}
-    models_to_try = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]
-    for model in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url, json=payload, headers=headers, timeout=20)
-            if response.status_code == 200: return response.json()['candidates'][0]['content']['parts'][0]['text']
-            elif response.status_code == 429: continue 
-        except Exception: continue
-    return "⏳ Whoa there! We've hit the Google free-tier speed limit. Give it exactly 60 seconds to cool down, and try asking me again!"
+    contents = [{"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["text"]}]} for m in chat_history]
+    reply = generate(contents, GEMINI_API_KEY, timeout=20)
+    return reply or "⏳ We've hit the Gemini free-tier speed limit. Give it 60 seconds and ask again!"
 
 def analyze_new_tool(url):
     page_content = scrape_website_text(url)
@@ -202,17 +140,11 @@ def analyze_new_tool(url):
     DESCRIPTION: [A punchy 1-2 sentence description of what it does and why an AI student needs it]
     Website Content: {page_content[:10000]}
     """
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    headers = {'Content-Type': 'application/json'}
-    for model in ["gemini-2.5-flash", "gemini-2.5-flash-lite"]:
-        url_api = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            response = requests.post(url_api, json=payload, headers=headers, timeout=20)
-            if response.status_code == 200:
-                resp = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-                return extract_field(resp, "NAME"), extract_field(resp, "CATEGORY"), extract_field(resp, "DESCRIPTION")
-        except Exception: continue
-    return "Unknown Tool", "Other", "Could not analyze the website. It might be actively blocking AI scrapers."
+    resp = generate(prompt, GEMINI_API_KEY, models=["gemini-2.5-flash", "gemini-2.5-flash-lite"], timeout=20)
+    if resp is None:
+        return "Unknown Tool", "Other", "Could not analyze the website. It might be actively blocking AI scrapers."
+    f = parse_fields(resp, ["NAME", "CATEGORY", "DESCRIPTION"])
+    return f["NAME"], f["CATEGORY"], f["DESCRIPTION"]
 
 def load_toolbox_data():
     if not os.path.exists(TOOLBOX_CSV):
@@ -243,7 +175,7 @@ def load_data():
     if not os.path.exists(CSV_FILE): return pd.DataFrame()
     try:
         df = pd.read_csv(CSV_FILE, dtype=str).fillna("")
-        for col in ['Opportunity Name', 'Description Snippet', 'Direct Link', 'Status', 'Sponsorship', 'Eligibility', 'Location', 'Deadline', 'Requirements', 'Contact Name', 'LinkedIn', 'Analyzed']:
+        for col in OPPORTUNITY_COLUMNS:
             if col not in df.columns: df[col] = ""
         return df
     except Exception: return pd.DataFrame()
@@ -272,7 +204,7 @@ with st.sidebar:
     if st.button("🗑️ Wipe Database", type="primary", use_container_width=True):
         with st.spinner("Purging Cloud Database..."):
             # 1. Create a perfectly blank matrix with the right column headers
-            empty_df = pd.DataFrame(columns=['Opportunity Name', 'Description Snippet', 'Direct Link', 'Status', 'Sponsorship', 'Eligibility', 'Location', 'Deadline', 'Requirements', 'Contact Name', 'LinkedIn', 'Analyzed'])
+            empty_df = pd.DataFrame(columns=OPPORTUNITY_COLUMNS)
             
             # 2. Push the blank matrix straight to GitHub to overwrite the old one!
             save_to_github(empty_df, CSV_FILE)
@@ -289,11 +221,16 @@ if run_search:
     log_container = st.empty()
     log_text = ""
     with st.spinner("Scraping Google..."):
-        process = subprocess.Popen([sys.executable, "-u", "scraper.py", "--type", opp_type, "--country", country, "--level", academic_level], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, encoding='utf-8', errors='replace')
+        # Pass the key explicitly so scraper.py never needs it written in the code.
+        scraper_env = {**os.environ, "SERPAPI_KEY": SERPAPI_KEY}
+        process = subprocess.Popen([sys.executable, "-u", "scraper.py", "--type", opp_type, "--country", country, "--level", academic_level], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, encoding='utf-8', errors='replace', env=scraper_env)
         for line in iter(process.stdout.readline, ''):
             log_text += line
             log_container.code(log_text, language="bash")
         process.wait()
+    # scraper.py only writes the local CSV. Save it to GitHub too, otherwise new finds
+    # vanish if Streamlit Cloud restarts before your next swipe.
+    save_to_github(load_data(), CSV_FILE)
     st.success("Gathering Complete! Loading Deck...")
     time.sleep(2)
     st.rerun()
