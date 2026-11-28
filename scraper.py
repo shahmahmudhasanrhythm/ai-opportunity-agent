@@ -5,11 +5,16 @@ import sys
 import argparse
 import pandas as pd
 
+from agent.config import OPPORTUNITY_COLUMNS
+from agent.search import build_queries
+
 if sys.stdout.encoding.lower() != 'utf-8':
     try: sys.stdout.reconfigure(encoding='utf-8')
     except Exception: pass
 
-SERPAPI_KEY = "4135a7f707639cbaf7eb64499c133556faf5cf1698323af84437dcc9a59a51f9"
+# The key used to be written here in plain text, in a public repo.
+# Now it comes from the environment (Streamlit Cloud exposes secrets as env vars).
+SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 CSV_FILENAME = "AI_Opportunities_Groq_Smart.csv"
 
 def run_fast_gatherer(opp_type, country, academic_level):
@@ -19,7 +24,7 @@ def run_fast_gatherer(opp_type, country, academic_level):
 
     if os.path.exists(CSV_FILENAME):
         existing_df = pd.read_csv(CSV_FILENAME, dtype=str).fillna("")
-        for col in ["Sponsorship", "Eligibility", "Location", "Deadline", "Requirements", "Contact Name", "LinkedIn", "Status", "Analyzed"]:
+        for col in OPPORTUNITY_COLUMNS:
             if col not in existing_df.columns: existing_df[col] = ""
         existing_links = set(existing_df['Direct Link'].astype(str).tolist())
     else:
@@ -27,46 +32,12 @@ def run_fast_gatherer(opp_type, country, academic_level):
         existing_links = set()
 
     url = "https://serpapi.com/search.json"
-    
-    # --- UPGRADE 1: THE NEGATIVE FILTER BOUNCER ---
-    # This physically forces Google to hide pages meant for grads or full-time employees
-    neg_terms = '-phd -master -masters -postdoc -graduate -"full-time" -"senior"'
-    
-    type_str = "internship OR research OR fellowship OR hackathon" if opp_type.lower() == "any" else opp_type.lower()
-    country_str = "" if country.lower() == "any" else f"in {country}"
-    
-    # Force exact match phrasing for the academic level
-    if academic_level == "Any Undergraduate":
-        level_str = '("undergraduate" OR "bachelor" OR "bachelors")'
-    else:
-        level_str = f'("{academic_level}" OR "undergraduate")'
-    
-    search_queries = []
-    
-    if opp_type.lower() in ["internship", "summer internship"]:
-        search_queries = [
-            f"AI {level_str} {type_str} \"2026\" {country_str} site:linkedin.com/jobs {neg_terms}",
-            f"machine learning {type_str} \"2026\" {country_str} {level_str} site:builtin.com OR site:glassdoor.com {neg_terms}",
-            f"artificial intelligence {level_str} {type_str} \"2026\" {country_str} {neg_terms}"
-        ]
-    elif opp_type.lower() in ["research", "summer research", "summer school", "fellowship"]:
-        search_queries = [
-            f"AI {level_str} {type_str} \"2026\" {country_str} site:.edu OR site:.ac.uk {neg_terms}",
-            f"machine learning research lab {country_str} {level_str} applications \"2026\" {neg_terms}",
-            f"artificial intelligence {type_str} summer \"2026\" {country_str} university {neg_terms}"
-        ]
-    elif opp_type.lower() == "hackathon":
-        search_queries = [
-            f"AI machine learning hackathon \"2026\" {country_str} {level_str} {neg_terms}",
-            f"university AI hackathon {country_str} \"2026\" site:devpost.com {neg_terms}"
-        ]
-    else:
-        search_queries = [
-            f"AI {level_str} {type_str} \"2026\" {country_str} {neg_terms}",
-            f"machine learning {type_str} \"2026\" {country_str} university {level_str} {neg_terms}"
-        ]
-        
-    search_queries = [" ".join(q.split()) for q in search_queries]
+    if not SERPAPI_KEY:
+        print("ERROR: SERPAPI_KEY is not set. Add it to .streamlit/secrets.toml or export it in your shell.")
+        return
+
+    # Query building lives in agent/search.py so it can be unit-tested.
+    search_queries = build_queries(opp_type, country, academic_level)
     
     new_findings = []
 
