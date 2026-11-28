@@ -1,11 +1,14 @@
-# AI Opportunity Agent
+<p align="center"><img src="docs/card.png" alt="AI Opportunity Agent" width="100%"></p>
+
+<p align="center">
+  <a href="https://github.com/shahmahmudhasanrhythm/ai-opportunity-agent/actions/workflows/tests.yml"><img src="https://github.com/shahmahmudhasanrhythm/ai-opportunity-agent/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/license-MIT-5eead4" alt="MIT license">
+</p>
 
 A Streamlit app that finds **undergraduate AI internships, research programs, fellowships and hackathons**, reads each posting with Gemini, and lets you sort through them like a swipe deck.
 
 I built it because, as a first-year student, I was spending hours on searches that mostly returned PhD and senior roles.
-
-> 📸 *Add a screenshot of the Swipe Deck here: `docs/swipe-deck.png`*
-> 🔗 *Live app: add your Streamlit Cloud URL here*
 
 ## Features
 
